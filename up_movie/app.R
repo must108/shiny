@@ -5,10 +5,7 @@ library(stringr)
 library(dplyr)
 library(tools)
 
-file <- "https://github.com/rstudio-education/shiny-course/raw/main/movies.RData" # nolint
-destfile <- "movies.RData"
-
-load("movies.RData")
+load("C:/github/R/r-web-apps/git-shiny/up_movie/movies.RData")
 
 ui <- fluidPage(
   titlePanel("Movie browser"),
@@ -101,7 +98,7 @@ ui <- fluidPage(
       plotOutput(outputId = "scatterplot"),
       br(),
 
-      uiOutput(outputId = "scatterplot"),
+      uiOutput(outputId = "n"),
       br(), br(),
 
       DT::dataTableOutput(outputId = "moviestable")
@@ -109,7 +106,7 @@ ui <- fluidPage(
   )
 ) # create a page with fluid layout
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   movies_subset <- reactive({
     req(input$selected_type) # check that the value exists
     filter(movies, title_type %in% input$selected_type)
@@ -134,8 +131,8 @@ server <- function(input, output) {
   # format title properly
 
   output$scatterplot <- renderPlot({
-    ggplot(data = movies_sample(), aes_string(x = input$x, y = input$y,
-                                              color = input$z)) +
+    ggplot(data = movies_sample(), aes(x = !!sym(input$x), y = !!sym(input$y),
+                                       color = !!sym(input$z))) +
       geom_point(alpha = input$alpha, size = input$size) +
       labs(x = toTitleCase(str_replace_all(input$x, "_", " ")),
         y = toTitleCase(str_replace_all(input$y, "_", " ")),
@@ -153,6 +150,21 @@ server <- function(input, output) {
     HTML(paste("There are", counts, input$selected_type,
                "movies in this dataset. <br>"))
   })
+
+  output$moviestable <- DT::renderDataTable(
+    if (input$show_data) {
+      DT::datatable(data = movies_sample()[, 1:7],
+                    options = list(pageLength = 10),
+                    rownames = FALSE)
+    }
+  ) # shows the data table on user input
+
+  observeEvent(eventExpr = input$write_csv,
+               handlerExpr = {
+                 filename <- paste0(
+                    "movies_", str_replace_all(Sys.time(), ":|\ ", "_"), ".csv") # nolint
+                 write.csv(movies_sample(), file = filename, row.names = FALSE)
+               }) # allows for csv export if user allows
 }
 
 shinyApp(ui, server)
